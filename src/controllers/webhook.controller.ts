@@ -1,8 +1,12 @@
 import { Request, Response } from 'express';
-import { gerarRespostaGemini } from '../services/gemini.service';
+import { gerarRespostaComHistorico } from '../services/conversation-handler';
+import { inicializarLimpezaDeConversas } from '../services/conversation-handler';
 import { config } from '../config/env';
 import { logger } from '../utils/logger';
 import fetch from 'node-fetch';
+
+// Inicializa o sistema de limpeza de conversas
+inicializarLimpezaDeConversas();
 
 export const handleWebhook = async (req: Request, res: Response): Promise<void> => {
   const payload = req.body?.payload;
@@ -16,8 +20,10 @@ export const handleWebhook = async (req: Request, res: Response): Promise<void> 
   }
 
   try {
-    const resposta = await gerarRespostaGemini(mensagem);
+    // Gera resposta com histórico de conversa
+    const resposta = await gerarRespostaComHistorico(chatId, mensagem);
 
+    // Envia resposta para o WAHA
     await fetch(config.wahaUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -28,10 +34,10 @@ export const handleWebhook = async (req: Request, res: Response): Promise<void> 
         }),
       });
 
-    logger.info(`Mensagem enviada para ${chatId}`);
+    logger.info(`Mensagem enviada com sucesso para ${chatId}`);
     res.sendStatus(200);
   } catch (error) {
     logger.error(`Erro ao processar mensagem: ${error}`);
-    res.sendStatus(500);
+    res.status(500).send('Erro interno ao processar mensagem');
   }
 };
